@@ -1,38 +1,46 @@
-name: Build Rust Binary
+name: Build oxwm Binary
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Manual trigger only
+
+env:
+  BINARY_NAME: oxwm
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Install system dependencies (X11)
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y \
-          libx11-dev \
-          libx11-xcb-dev \
-          libxcb1-dev \
-          libxcb-ewmh-dev \
-          libxcb-icccm4-dev \
-          libxcb-util-dev \
-          libxcb-keysyms1-dev \
-          libxcb-shape0-dev \
-          pkg-config
+      - name: Install X11 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev \
+            libxft-dev \
+            libxinerama-dev \
+            libxcb1-dev \
+            libxcb-xinerama0-dev \
+            libxcb-keysyms1-dev \
+            libxcb-util-dev \
+            pkg-config
 
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
-    - name: Build release binary
-      run: cargo build --release
+      - name: Build
+        run: cargo build --release
 
-    - name: Upload binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: oxwm
-        path: target/release/*
+      - name: Create download package
+        run: |
+          mv target/release/${{ env.BINARY_NAME }} oxwm
+          tar -czf oxwm.tar.gz oxwm
+          echo "Binary ready for download!"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: oxwm-binary
+          path: oxwm.tar.gz
