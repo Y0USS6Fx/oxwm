@@ -1,8 +1,11 @@
 pub mod grid;
 pub mod monocle;
 pub mod normie;
+pub mod scrolling;
 pub mod tabbed;
 pub mod tiling;
+
+use std::str::FromStr;
 
 use x11rb::protocol::xproto::Window;
 
@@ -21,16 +24,18 @@ pub enum LayoutType {
     Grid,
     Monocle,
     Tabbed,
+    Scrolling,
 }
 
 impl LayoutType {
-    pub fn new(&self) -> LayoutBox {
+    pub fn to_boxed_layout(&self) -> LayoutBox {
         match self {
             Self::Tiling => Box::new(tiling::TilingLayout),
             Self::Normie => Box::new(normie::NormieLayout),
             Self::Grid => Box::new(grid::GridLayout),
             Self::Monocle => Box::new(monocle::MonocleLayout),
             Self::Tabbed => Box::new(tabbed::TabbedLayout),
+            Self::Scrolling => Box::new(scrolling::ScrollingLayout),
         }
     }
 
@@ -40,7 +45,8 @@ impl LayoutType {
             Self::Normie => Self::Grid,
             Self::Grid => Self::Monocle,
             Self::Monocle => Self::Tabbed,
-            Self::Tabbed => Self::Tiling,
+            Self::Tabbed => Self::Scrolling,
+            Self::Scrolling => Self::Tiling,
         }
     }
 
@@ -51,16 +57,22 @@ impl LayoutType {
             Self::Grid => "grid",
             Self::Monocle => "monocle",
             Self::Tabbed => "tabbed",
+            Self::Scrolling => "scrolling",
         }
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, String> {
+impl FromStr for LayoutType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, String> {
         match s.to_lowercase().as_str() {
             "tiling" => Ok(Self::Tiling),
             "normie" | "floating" => Ok(Self::Normie),
             "grid" => Ok(Self::Grid),
             "monocle" => Ok(Self::Monocle),
             "tabbed" => Ok(Self::Tabbed),
+            "scrolling" => Ok(Self::Scrolling),
             _ => Err(format!("Invalid Layout Type: {}", s)),
         }
     }
@@ -68,7 +80,7 @@ impl LayoutType {
 
 pub fn layout_from_str(s: &str) -> Result<LayoutBox, String> {
     let layout_type = LayoutType::from_str(s)?;
-    Ok(layout_type.new())
+    Ok(layout_type.to_boxed_layout())
 }
 
 pub fn next_layout(current_name: &str) -> &'static str {

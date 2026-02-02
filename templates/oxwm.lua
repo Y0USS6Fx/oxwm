@@ -37,6 +37,10 @@ function oxwm.set_modkey(modkey) end
 ---@param tags string[] Array of tag names
 function oxwm.set_tags(tags) end
 
+---Enable or disable automatic tiling of new windows
+---@param enabled boolean Enable or disable auto-tiling
+function oxwm.auto_tile(enabled) end
+
 ---Set layout symbol override
 ---@param name string Layout name (e.g., "tiling", "normie", "tabbed", "grid", "monocle")
 ---@param symbol string Symbol to display (e.g., "[T]", "[F]", "[=]")
@@ -47,7 +51,7 @@ function oxwm.set_layout_symbol(name, symbol) end
 oxwm.rule = {}
 
 ---Add a window rule
----@param rule {class: string?, instance: string?, title: string?, role: string?, floating: boolean?, tag: integer?, fullscreen: boolean?} Rule configuration
+---@param rule {class: string?, instance: string?, title: string?, role: string?, floating: boolean?, tag: integer?, fullscreen: boolean?, focus: boolean?} Rule configuration
 function oxwm.rule.add(rule) end
 
 ---Quit the window manager
@@ -188,9 +192,17 @@ oxwm.layout = {}
 function oxwm.layout.cycle() end
 
 ---Set specific layout
----@param name string Layout name (e.g., "tiling", "normie", "tabbed", "grid", "monocle")
+---@param name string Layout name (e.g., "tiling", "normie", "tabbed", "grid", "monocle", "scrolling")
 ---@return table Action table for keybinding
 function oxwm.layout.set(name) end
+
+---Scroll layout left (for scrolling layout)
+---@return table Action table for keybinding
+function oxwm.layout.scroll_left() end
+
+---Scroll layout right (for scrolling layout)
+---@return table Action table for keybinding
+function oxwm.layout.scroll_right() end
 
 ---Tag/workspace management module
 ---@class oxwm.tag
@@ -200,6 +212,22 @@ oxwm.tag = {}
 ---@param index integer Tag index (0-based)
 ---@return table Action table for keybinding
 function oxwm.tag.view(index) end
+
+---View/switch to next tag
+---@return table Action table for keybinding
+function oxwm.tag.view_next() end
+
+---View/switch to previous tag
+---@return table Action table for keybinding
+function oxwm.tag.view_previous() end
+
+---View/switch to next non-empty tag
+---@return table Action table for keybinding
+function oxwm.tag.view_next_nonempty() end
+
+---View/switch to previous non-empty tag
+---@return table Action table for keybinding
+function oxwm.tag.view_previous_nonempty() end
 
 ---Move focused window to tag
 ---@param index integer Tag index (0-based)
@@ -215,6 +243,10 @@ function oxwm.tag.toggleview(index) end
 ---@param index integer Tag index (0-based)
 ---@return table Action table for keybinding
 function oxwm.tag.toggletag(index) end
+
+---When enabled an attempt to view the current tag switches back to the previously viewed tag.
+---@param enabled boolean Enable or disable tag_back_and_forth
+function oxwm.tag.set_back_and_forth(enabled) end
 
 ---Status bar configuration module
 ---@class oxwm.bar
@@ -263,7 +295,7 @@ function oxwm.bar.block.shell(config) end
 function oxwm.bar.block.static(config) end
 
 ---Create a battery status block
----@param config {format: string, charging: string, discharging: string, full: string, interval: integer, color: string|integer, underline: boolean} Block configuration
+---@param config {format: string, charging: string, discharging: string, full: string, interval: integer, color: string|integer, underline: boolean, battery_name: string} Block configuration
 ---@return table Block configuration
 function oxwm.bar.block.battery(config) end
 
@@ -284,6 +316,16 @@ function oxwm.bar.set_scheme_occupied(foreground, background, underline) end
 ---@param background string|integer Background color
 ---@param underline string|integer Underline color
 function oxwm.bar.set_scheme_selected(foreground, background, underline) end
+
+---Set urgent tag color scheme (tags with urgent windows)
+---@param foreground string|integer Foreground color
+---@param background string|integer Background color
+---@param underline string|integer Underline color
+function oxwm.bar.set_scheme_urgent(foreground, background, underline) end
+
+---Hide tags that have no windows and are not currently selected
+---@param hide boolean Whether to hide vacant tags
+function oxwm.bar.set_hide_vacant_tags(hide) end
 
 ---Add an autostart command
 ---@param cmd string Command to run at startup

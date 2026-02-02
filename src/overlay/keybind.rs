@@ -103,9 +103,10 @@ impl KeybindOverlay {
         self.last_shown_at = Some(Instant::now());
         self.max_key_width = max_key_width;
 
-        self.base.show(connection)?;
-
+        self.base.is_visible = true;
         self.draw(connection, font)?;
+
+        self.base.show(connection)?;
 
         Ok(())
     }
@@ -123,7 +124,15 @@ impl KeybindOverlay {
         if self.base.is_visible {
             self.hide(connection)?;
         } else {
-            self.show(connection, font, keybindings, monitor_x, monitor_y, screen_width, screen_height)?;
+            self.show(
+                connection,
+                font,
+                keybindings,
+                monitor_x,
+                monitor_y,
+                screen_width,
+                screen_height,
+            )?;
         }
         Ok(())
     }
@@ -159,12 +168,12 @@ impl KeybindOverlay {
                 .filter(|kb| kb.func == action)
                 .min_by_key(|kb| kb.keys.len());
 
-            if let Some(binding) = binding {
-                if !binding.keys.is_empty() {
-                    let key_str = self.format_key_combo(&binding.keys[0]);
-                    let action_str = self.action_description(binding);
-                    result.push((key_str, action_str));
-                }
+            if let Some(binding) = binding
+                && !binding.keys.is_empty()
+            {
+                let key_str = self.format_key_combo(&binding.keys[0]);
+                let action_str = self.action_description(binding);
+                result.push((key_str, action_str));
             }
         }
 
@@ -211,6 +220,10 @@ impl KeybindOverlay {
                 Arg::Int(n) => format!("View Workspace {}", n),
                 _ => "View Workspace".to_string(),
             },
+            KeyAction::ViewNextTag => "View Next Workspace".to_string(),
+            KeyAction::ViewPreviousTag => "View Previous Workspace".to_string(),
+            KeyAction::ViewNextNonEmptyTag => "View Next Non-Empty Workspace".to_string(),
+            KeyAction::ViewPreviousNonEmptyTag => "View Previous Non-Empty Workspace".to_string(),
             KeyAction::ToggleView => match &binding.arg {
                 Arg::Int(n) => format!("Toggle View Workspace {}", n),
                 _ => "Toggle View Workspace".to_string(),
@@ -226,6 +239,8 @@ impl KeybindOverlay {
             KeyAction::TagMonitor => "Send Window to Monitor".to_string(),
             KeyAction::SetMasterFactor => "Adjust Master Area Size".to_string(),
             KeyAction::IncNumMaster => "Adjust Number of Master Windows".to_string(),
+            KeyAction::ScrollLeft => "Scroll Layout Left".to_string(),
+            KeyAction::ScrollRight => "Scroll Layout Right".to_string(),
             KeyAction::None => "No Action".to_string(),
         }
     }
@@ -297,9 +312,8 @@ impl Overlay for KeybindOverlay {
             y += line_height as i16;
         }
 
-        self.base.font_draw.flush();
-
         connection.flush()?;
+        self.base.font_draw.sync();
 
         Ok(())
     }

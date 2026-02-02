@@ -5,8 +5,15 @@ use x11rb::connection::Connection;
 use x11rb::protocol::xproto::*;
 
 use crate::errors::X11Error;
-use crate::keyboard::keysyms::{self, Keysym};
+use crate::keyboard::keysyms::{self, Keysym, format_keysym};
 
+/// When adding a new action, update:
+/// 1. Add variant here
+/// 2. lua_api.rs: string_to_action()
+/// 3. lua_api.rs: register_*_module()
+/// 4. window_manager.rs: handle_key_action()
+/// 5. (optionally) overlay/keybind.rs: action_description()
+/// 6. templates/oxwm.lua
 #[derive(Debug, Copy, Clone, Deserialize, PartialEq)]
 pub enum KeyAction {
     Spawn,
@@ -17,6 +24,10 @@ pub enum KeyAction {
     Quit,
     Restart,
     ViewTag,
+    ViewNextTag,
+    ViewPreviousTag,
+    ViewNextNonEmptyTag,
+    ViewPreviousNonEmptyTag,
     ToggleView,
     MoveToTag,
     ToggleTag,
@@ -30,6 +41,8 @@ pub enum KeyAction {
     ShowKeybindOverlay,
     SetMasterFactor,
     IncNumMaster,
+    ScrollLeft,
+    ScrollRight,
     None,
 }
 
@@ -47,13 +60,22 @@ impl Arg {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct KeyPress {
     pub(crate) modifiers: Vec<KeyButMask>,
     pub(crate) keysym: Keysym,
 }
 
-#[derive(Clone)]
+impl std::fmt::Debug for KeyPress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KeyPress")
+            .field("modifiers", &self.modifiers)
+            .field("keysym", &format_keysym(self.keysym))
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct KeyBinding {
     pub(crate) keys: Vec<KeyPress>,
     pub(crate) func: KeyAction,
@@ -118,13 +140,18 @@ impl KeyboardMapping {
         self.syms.get(index).copied().unwrap_or(0)
     }
 
-    pub fn find_keycode(&self, keysym: Keysym, min_keycode: Keycode, max_keycode: Keycode) -> Option<Keycode> {
+    pub fn find_keycode(
+        &self,
+        keysym: Keysym,
+        min_keycode: Keycode,
+        max_keycode: Keycode,
+    ) -> Option<Keycode> {
         for keycode in min_keycode..=max_keycode {
             let index = (keycode - self.min_keycode) as usize * self.keysyms_per_keycode as usize;
-            if let Some(&sym) = self.syms.get(index) {
-                if sym == keysym {
-                    return Some(keycode);
-                }
+            if let Some(&sym) = self.syms.get(index)
+                && sym == keysym
+            {
+                return Some(keycode);
             }
         }
         None
@@ -193,17 +220,18 @@ pub fn grab_keys(
         }
     }
 
-    if current_key > 0 {
-        if let Some(escape_keycode) = mapping.find_keycode(keysyms::XK_ESCAPE, min_keycode, max_keycode) {
-            connection.grab_key(
-                true,
-                root,
-                ModMask::ANY,
-                escape_keycode,
-                GrabMode::ASYNC,
-                GrabMode::ASYNC,
-            )?;
-        }
+    if current_key > 0
+        && let Some(escape_keycode) =
+            mapping.find_keycode(keysyms::XK_ESCAPE, min_keycode, max_keycode)
+    {
+        connection.grab_key(
+            true,
+            root,
+            ModMask::ANY,
+            escape_keycode,
+            GrabMode::ASYNC,
+            GrabMode::ASYNC,
+        )?;
     }
 
     connection.flush()?;

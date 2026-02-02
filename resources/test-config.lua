@@ -28,11 +28,14 @@ local colors = {
     blue = 0x6dade3,
 }
 
+
 local modkey = "Mod1"
 
 oxwm.set_terminal("st")
 oxwm.set_modkey(modkey)
 oxwm.set_tags({ "1", "2", "3", "4", "5", "6", "7", "8", "9" })
+oxwm.auto_tile(true);
+oxwm.bar.set_hide_vacant_tags(true);
 
 oxwm.set_layout_symbol("tiling", "[T]")
 oxwm.set_layout_symbol("normie", "[F]")
@@ -42,7 +45,7 @@ oxwm.border.set_focused_color(colors.blue)
 oxwm.border.set_unfocused_color(colors.grey)
 
 oxwm.gaps.set_enabled(true)
-oxwm.gaps.set_smart(true)  -- Disable outer gaps when only 1 window (dwm smartgaps)
+oxwm.gaps.set_smart(true) -- Disable outer gaps when only 1 window (dwm smartgaps)
 oxwm.gaps.set_inner(5, 5)
 oxwm.gaps.set_outer(5, 5)
 
@@ -55,13 +58,14 @@ oxwm.bar.set_font("JetBrainsMono Nerd Font:style=Bold:size=12")
 oxwm.bar.set_scheme_normal(colors.fg, colors.bg, 0x444444)
 oxwm.bar.set_scheme_occupied(colors.cyan, colors.bg, colors.cyan)
 oxwm.bar.set_scheme_selected(colors.cyan, colors.bg, colors.purple)
+oxwm.bar.set_scheme_urgent(colors.red, colors.bg, colors.red)
 
 oxwm.key.chord({
     { { modkey }, "Space" },
     { {},         "T" }
-}, oxwm.spawn("st"))
+}, oxwm.spawn_terminal())
 
-oxwm.key.bind({ modkey }, "Return", oxwm.spawn("st"))
+oxwm.key.bind({ modkey }, "Return", oxwm.spawn_terminal())
 oxwm.key.bind({ modkey }, "D", oxwm.spawn({ "sh", "-c", "dmenu_run -l 10" }))
 oxwm.key.bind({ modkey }, "S", oxwm.spawn({ "sh", "-c", "maim -s | xclip -selection clipboard -t image/png" }))
 oxwm.key.bind({ modkey }, "Q", oxwm.client.kill())
@@ -73,21 +77,25 @@ oxwm.key.bind({ modkey, "Shift" }, "Space", oxwm.client.toggle_floating())
 
 oxwm.key.bind({ modkey }, "F", oxwm.layout.set("normie"))
 oxwm.key.bind({ modkey }, "C", oxwm.layout.set("tiling"))
+oxwm.key.bind({ modkey }, "G", oxwm.layout.set("scrolling"))
 oxwm.key.bind({ modkey }, "N", oxwm.layout.cycle())
+
+oxwm.key.bind({ modkey }, "Left", oxwm.layout.scroll_left())
+oxwm.key.bind({ modkey }, "Right", oxwm.layout.scroll_right())
 
 oxwm.key.bind({ modkey }, "A", oxwm.toggle_gaps())
 
 -- Master area controls
-oxwm.key.bind({ modkey }, "BracketLeft", oxwm.set_master_factor(-5))   -- Decrease master area
-oxwm.key.bind({ modkey }, "BracketRight", oxwm.set_master_factor(5))   -- Increase master area
-oxwm.key.bind({ modkey }, "I", oxwm.inc_num_master(1))                 -- More master windows
-oxwm.key.bind({ modkey }, "P", oxwm.inc_num_master(-1))                -- Fewer master windows
+oxwm.key.bind({ modkey }, "BracketLeft", oxwm.set_master_factor(-5)) -- Decrease master area
+oxwm.key.bind({ modkey }, "BracketRight", oxwm.set_master_factor(5)) -- Increase master area
+oxwm.key.bind({ modkey }, "I", oxwm.inc_num_master(1))               -- More master windows
+oxwm.key.bind({ modkey }, "P", oxwm.inc_num_master(-1))              -- Fewer master windows
 
 -- Multi-monitor controls (dwm-style)
-oxwm.key.bind({ modkey }, "Comma", oxwm.monitor.focus(-1))              -- Focus previous monitor
-oxwm.key.bind({ modkey }, "Period", oxwm.monitor.focus(1))              -- Focus next monitor
-oxwm.key.bind({ modkey, "Shift" }, "Comma", oxwm.monitor.tag(-1))      -- Send window to previous monitor
-oxwm.key.bind({ modkey, "Shift" }, "Period", oxwm.monitor.tag(1))      -- Send window to next monitor
+oxwm.key.bind({ modkey }, "Comma", oxwm.monitor.focus(-1))        -- Focus previous monitor
+oxwm.key.bind({ modkey }, "Period", oxwm.monitor.focus(1))        -- Focus next monitor
+oxwm.key.bind({ modkey, "Shift" }, "Comma", oxwm.monitor.tag(-1)) -- Send window to previous monitor
+oxwm.key.bind({ modkey, "Shift" }, "Period", oxwm.monitor.tag(1)) -- Send window to next monitor
 
 oxwm.key.bind({ modkey, "Shift" }, "Q", oxwm.quit())
 oxwm.key.bind({ modkey, "Shift" }, "R", oxwm.restart())
@@ -144,6 +152,12 @@ oxwm.key.bind({ modkey, "Control", "Shift" }, "7", oxwm.tag.toggletag(6))
 oxwm.key.bind({ modkey, "Control", "Shift" }, "8", oxwm.tag.toggletag(7))
 oxwm.key.bind({ modkey, "Control", "Shift" }, "9", oxwm.tag.toggletag(8))
 
+oxwm.key.bind({ modkey }, "Tab", oxwm.tag.view_next())
+oxwm.key.bind({ modkey, "Shift" }, "Tab", oxwm.tag.view_previous())
+
+oxwm.key.bind({ modkey, "Control" }, "Tab", oxwm.tag.view_next_nonempty())
+oxwm.key.bind({ modkey, "Control", "Shift" }, "Tab", oxwm.tag.view_previous_nonempty())
+
 oxwm.bar.set_blocks({
     oxwm.bar.block.battery({
         format = "Bat: {}%",
@@ -153,6 +167,7 @@ oxwm.bar.set_blocks({
         interval = 30,
         color = colors.green,
         underline = true,
+        battery_name = "BAT1"
     }),
     -- oxwm.bar.block.battery({
     --     charging = "󰂄 Bat: {}%",

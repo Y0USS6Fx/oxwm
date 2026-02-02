@@ -21,7 +21,7 @@
 -- Modifier key: "Mod4" is the Super/Windows key, "Mod1" is Alt
 local modkey = "Mod4"
 
--- Terminal emulator command (defualts to alacritty)
+-- Terminal emulator command (defaults to alacritty)
 local terminal = "alacritty"
 
 -- Color palette - customize these to match your theme
@@ -144,7 +144,9 @@ oxwm.gaps.set_outer(5, 5)
 
 -- Examples (uncomment to use):
 oxwm.rule.add({ instance = "gimp", floating = true })                             
+-- oxwm.rule.add({ class = "Alacritty", tag = 9, focus = true })                             
 -- oxwm.rule.add({ class = "firefox", title = "Library", floating = true })  
+-- oxwm.rule.add({ class = "firefox", tag = 2 })  
 -- oxwm.rule.add({ instance = "mpv", floating = true })                      
 
 -- To find window properties, use xprop and click on the window
@@ -168,6 +170,11 @@ oxwm.bar.set_scheme_normal(colors.fg, colors.bg, "#444444")
 oxwm.bar.set_scheme_occupied(colors.cyan, colors.bg, colors.cyan)
 -- Currently selected tag
 oxwm.bar.set_scheme_selected(colors.cyan, colors.bg, colors.purple)
+-- Urgent tags (windows requesting attention)
+oxwm.bar.set_scheme_urgent(colors.red, colors.bg, colors.red)
+
+-- Hide tags that have no windows and are not selected
+-- oxwm.bar.set_hide_vacant_tags(true)
 
 -------------------------------------------------------------------------------
 -- Keybindings

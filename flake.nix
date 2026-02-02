@@ -21,23 +21,19 @@
 
     devShells = forAllSystems (pkgs: {
       default = pkgs.mkShell {
-        buildInputs = [
+        inputsFrom = [self.packages.${pkgs.stdenv.hostPlatform.system}.oxwm];
+        packages = [
           pkgs.rustc
           pkgs.cargo
+          pkgs.clippy
           pkgs.alacritty
           pkgs.just
           pkgs.xorg.xorgserver
-          pkgs.xorg.libX11
-          pkgs.xorg.libXft
-          pkgs.xorg.libXrender
-          pkgs.freetype
-          pkgs.fontconfig
-          pkgs.pkg-config
         ];
         shellHook = ''
           export PS1="(oxwm-dev) $PS1"
         '';
-        RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
+        env.RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
       };
     });
 
@@ -56,13 +52,26 @@
         enable = mkEnableOption "oxwm window manager";
         package = mkOption {
           type = types.package;
-          default = self.packages.${pkgs.system}.default;
+          default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
           description = "The oxwm package to use";
+        };
+        extraSessionCommands = mkOption {
+          type = types.lines;
+          default = "";
+          description = "Shell commands executed just before oxwm is started";
         };
       };
 
       config = mkIf cfg.enable {
-        services.displayManager.sessionPackages = [cfg.package];
+        services.xserver.windowManager.session = lib.singleton {
+          name = "oxwm";
+          start = ''
+            ${cfg.extraSessionCommands}
+            export _JAVA_AWT_WM_NONREPARENTING=1
+            ${cfg.package}/bin/oxwm &
+            waitPID=$!
+          '';
+        };
 
         environment.systemPackages = [
           cfg.package

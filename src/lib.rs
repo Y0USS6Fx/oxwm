@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+
+pub mod animations;
 pub mod bar;
 pub mod client;
 pub mod config;
@@ -20,33 +23,46 @@ pub mod prelude {
     pub use x11rb::protocol::xproto::KeyButMask;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct LayoutSymbolOverride {
     pub name: String,
     pub symbol: String,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct WindowRule {
     pub class: Option<String>,
     pub instance: Option<String>,
     pub title: Option<String>,
     pub tags: Option<u32>,
+    pub focus: Option<bool>,
     pub is_floating: Option<bool>,
     pub monitor: Option<usize>,
 }
 
 impl WindowRule {
     pub fn matches(&self, class: &str, instance: &str, title: &str) -> bool {
-        let class_matches = self.class.as_ref().map_or(true, |c| class.contains(c.as_str()));
-        let instance_matches = self.instance.as_ref().map_or(true, |i| instance.contains(i.as_str()));
-        let title_matches = self.title.as_ref().map_or(true, |t| title.contains(t.as_str()));
+        let class_matches = self
+            .class
+            .as_ref()
+            .is_none_or(|c| class.contains(c.as_str()));
+        let instance_matches = self
+            .instance
+            .as_ref()
+            .is_none_or(|i| instance.contains(i.as_str()));
+        let title_matches = self
+            .title
+            .as_ref()
+            .is_none_or(|t| title.contains(t.as_str()));
         class_matches && instance_matches && title_matches
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Config {
+    // Meta
+    pub path: Option<PathBuf>,
+
     // Appearance
     pub border_width: u32,
     pub border_focused: u32,
@@ -73,6 +89,7 @@ pub struct Config {
 
     // Keybindings
     pub keybindings: Vec<crate::keyboard::handlers::Key>,
+    pub tag_back_and_forth: bool,
 
     // Window rules
     pub window_rules: Vec<WindowRule>,
@@ -84,12 +101,14 @@ pub struct Config {
     pub scheme_normal: ColorScheme,
     pub scheme_occupied: ColorScheme,
     pub scheme_selected: ColorScheme,
+    pub scheme_urgent: ColorScheme,
 
-    // Autostart commands
     pub autostart: Vec<String>,
+    pub auto_tile: bool,
+    pub hide_vacant_tags: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct ColorScheme {
     pub foreground: u32,
     pub background: u32,
@@ -108,6 +127,7 @@ impl Default for Config {
         const TERMINAL: &str = "st";
 
         Self {
+            path: None,
             border_width: 2,
             border_focused: 0x6dade3,
             border_unfocused: 0xbbbbbb,
@@ -142,16 +162,36 @@ impl Default for Config {
                         "dmenu_run -l 10".to_string(),
                     ]),
                 ),
-                KeyBinding::single_key(vec![MODKEY], keysyms::XK_Q, KeyAction::KillClient, Arg::None),
-                KeyBinding::single_key(vec![MODKEY], keysyms::XK_N, KeyAction::CycleLayout, Arg::None),
+                KeyBinding::single_key(
+                    vec![MODKEY],
+                    keysyms::XK_Q,
+                    KeyAction::KillClient,
+                    Arg::None,
+                ),
+                KeyBinding::single_key(
+                    vec![MODKEY],
+                    keysyms::XK_N,
+                    KeyAction::CycleLayout,
+                    Arg::None,
+                ),
                 KeyBinding::single_key(
                     vec![MODKEY, SHIFT],
                     keysyms::XK_F,
                     KeyAction::ToggleFullScreen,
                     Arg::None,
                 ),
-                KeyBinding::single_key(vec![MODKEY], keysyms::XK_A, KeyAction::ToggleGaps, Arg::None),
-                KeyBinding::single_key(vec![MODKEY, SHIFT], keysyms::XK_Q, KeyAction::Quit, Arg::None),
+                KeyBinding::single_key(
+                    vec![MODKEY],
+                    keysyms::XK_A,
+                    KeyAction::ToggleGaps,
+                    Arg::None,
+                ),
+                KeyBinding::single_key(
+                    vec![MODKEY, SHIFT],
+                    keysyms::XK_Q,
+                    KeyAction::Quit,
+                    Arg::None,
+                ),
                 KeyBinding::single_key(
                     vec![MODKEY, SHIFT],
                     keysyms::XK_R,
@@ -285,6 +325,7 @@ impl Default for Config {
                     Arg::Int(8),
                 ),
             ],
+            tag_back_and_forth: false,
             window_rules: vec![],
             status_blocks: vec![crate::bar::BlockConfig {
                 format: "{}".to_string(),
@@ -308,7 +349,14 @@ impl Default for Config {
                 background: 0x1a1b26,
                 underline: 0xad8ee6,
             },
+            scheme_urgent: ColorScheme {
+                foreground: 0xff5555,
+                background: 0x1a1b26,
+                underline: 0xff5555,
+            },
             autostart: vec![],
+            auto_tile: false,
+            hide_vacant_tags: false,
         }
     }
 }

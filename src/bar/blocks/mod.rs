@@ -17,7 +17,7 @@ pub trait Block {
     fn color(&self) -> u32;
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BlockConfig {
     pub format: String,
     pub command: BlockCommand,
@@ -26,7 +26,7 @@ pub struct BlockConfig {
     pub underline: bool,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum BlockCommand {
     Shell(String),
     DateTime(String),
@@ -34,6 +34,7 @@ pub enum BlockCommand {
         format_charging: String,
         format_discharging: String,
         format_full: String,
+        battery_name: Option<String>,
     },
     Ram,
     Static(String),
@@ -58,12 +59,14 @@ impl BlockConfig {
                 format_charging,
                 format_discharging,
                 format_full,
+                battery_name,
             } => Box::new(Battery::new(
                 format_charging,
                 format_discharging,
                 format_full,
                 self.interval_secs,
                 self.color,
+                battery_name.clone(),
             )),
             BlockCommand::Ram => Box::new(Ram::new(&self.format, self.interval_secs, self.color)),
             BlockCommand::Static(text) => Box::new(StaticBlock::new(

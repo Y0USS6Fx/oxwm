@@ -1,11 +1,11 @@
-use crate::bar::font::{Font, FontDraw};
+use crate::ColorScheme;
+use crate::bar::font::{DrawingSurface, Font};
 use crate::errors::X11Error;
 use crate::layout::tabbed::TAB_BAR_HEIGHT;
-use crate::ColorScheme;
+use x11rb::COPY_DEPTH_FROM_PARENT;
 use x11rb::connection::Connection;
 use x11rb::protocol::xproto::*;
 use x11rb::rust_connection::RustConnection;
-use x11rb::COPY_DEPTH_FROM_PARENT;
 
 pub struct TabBar {
     window: Window,
@@ -14,9 +14,8 @@ pub struct TabBar {
     x_offset: i16,
     y_offset: i16,
     graphics_context: Gcontext,
-    pixmap: x11::xlib::Pixmap,
     display: *mut x11::xlib::Display,
-    font_draw: FontDraw,
+    surface: DrawingSurface,
     scheme_normal: ColorScheme,
     scheme_selected: ColorScheme,
 }
@@ -33,6 +32,7 @@ impl TabBar {
         width: u16,
         scheme_normal: ColorScheme,
         scheme_selected: ColorScheme,
+        cursor: u32,
     ) -> Result<Self, X11Error> {
         let window = connection.generate_id()?;
         let graphics_context = connection.generate_id()?;
@@ -64,24 +64,24 @@ impl TabBar {
                 .background(scheme_normal.background),
         )?;
 
+        unsafe {
+            x11::xlib::XDefineCursor(display, window as u64, cursor as u64);
+        }
+
         connection.map_window(window)?;
         connection.flush()?;
 
         let visual = unsafe { x11::xlib::XDefaultVisual(display, screen_num as i32) };
         let colormap = unsafe { x11::xlib::XDefaultColormap(display, screen_num as i32) };
-        let depth = unsafe { x11::xlib::XDefaultDepth(display, screen_num as i32) };
 
-        let pixmap = unsafe {
-            x11::xlib::XCreatePixmap(
-                display,
-                window as x11::xlib::Drawable,
-                width as u32,
-                height as u32,
-                depth as u32,
-            )
-        };
-
-        let font_draw = FontDraw::new(display, pixmap, visual, colormap)?;
+        let surface = DrawingSurface::new(
+            display,
+            window as x11::xlib::Drawable,
+            width as u32,
+            height as u32,
+            visual,
+            colormap,
+        )?;
 
         Ok(Self {
             window,
@@ -90,9 +90,8 @@ impl TabBar {
             x_offset: x,
             y_offset: y,
             graphics_context,
-            pixmap,
             display,
-            font_draw,
+            surface,
             scheme_normal,
             scheme_selected,
         })
@@ -116,15 +115,12 @@ impl TabBar {
         connection.flush()?;
 
         unsafe {
-            let gc = x11::xlib::XCreateGC(self.display, self.pixmap, 0, std::ptr::null_mut());
-            x11::xlib::XSetForeground(
-                self.display,
-                gc,
-                self.scheme_normal.background as u64,
-            );
+            let gc =
+                x11::xlib::XCreateGC(self.display, self.surface.pixmap(), 0, std::ptr::null_mut());
+            x11::xlib::XSetForeground(self.display, gc, self.scheme_normal.background as u64);
             x11::xlib::XFillRectangle(
                 self.display,
-                self.pixmap,
+                self.surface.pixmap(),
                 gc,
                 0,
                 0,
@@ -162,20 +158,29 @@ impl TabBar {
             let top_padding = 6;
             let text_y = top_padding + font.ascent();
 
-            self.font_draw
-                .draw_text(font, scheme.foreground, text_x, text_y, &display_title);
+            self.surface.font_draw().draw_text(
+                font,
+                scheme.foreground,
+                text_x,
+                text_y,
+                &display_title,
+            );
 
             if is_focused {
                 let underline_height = 3;
                 let underline_y = self.height as i16 - underline_height;
 
                 unsafe {
-                    let gc =
-                        x11::xlib::XCreateGC(self.display, self.pixmap, 0, std::ptr::null_mut());
+                    let gc = x11::xlib::XCreateGC(
+                        self.display,
+                        self.surface.pixmap(),
+                        0,
+                        std::ptr::null_mut(),
+                    );
                     x11::xlib::XSetForeground(self.display, gc, scheme.underline as u64);
                     x11::xlib::XFillRectangle(
                         self.display,
-                        self.pixmap,
+                        self.surface.pixmap(),
                         gc,
                         x_position as i32,
                         underline_y as i32,
@@ -195,10 +200,11 @@ impl TabBar {
 
     fn copy_pixmap_to_window(&self) {
         unsafe {
-            let gc = x11::xlib::XCreateGC(self.display, self.window as u64, 0, std::ptr::null_mut());
+            let gc =
+                x11::xlib::XCreateGC(self.display, self.window as u64, 0, std::ptr::null_mut());
             x11::xlib::XCopyArea(
                 self.display,
-                self.pixmap,
+                self.surface.pixmap(),
                 self.window as u64,
                 gc,
                 0,
@@ -212,11 +218,7 @@ impl TabBar {
         }
     }
 
-    pub fn get_clicked_window(
-        &self,
-        windows: &[(Window, String)],
-        click_x: i16,
-    ) -> Option<Window> {
+    pub fn get_clicked_window(&self, windows: &[(Window, String)], click_x: i16) -> Option<Window> {
         if windows.is_empty() {
             return None;
         }
@@ -246,24 +248,17 @@ impl TabBar {
                 .width(width as u32),
         )?;
 
-        unsafe {
-            x11::xlib::XFreePixmap(self.display, self.pixmap);
-        }
-
-        let depth = unsafe { x11::xlib::XDefaultDepth(self.display, 0) };
-        self.pixmap = unsafe {
-            x11::xlib::XCreatePixmap(
-                self.display,
-                self.window as x11::xlib::Drawable,
-                width as u32,
-                self.height as u32,
-                depth as u32,
-            )
-        };
-
         let visual = unsafe { x11::xlib::XDefaultVisual(self.display, 0) };
         let colormap = unsafe { x11::xlib::XDefaultColormap(self.display, 0) };
-        self.font_draw = FontDraw::new(self.display, self.pixmap, visual, colormap)?;
+
+        self.surface = DrawingSurface::new(
+            self.display,
+            self.window as x11::xlib::Drawable,
+            width as u32,
+            self.height as u32,
+            visual,
+            colormap,
+        )?;
 
         connection.flush()?;
         Ok(())
@@ -279,13 +274,5 @@ impl TabBar {
         connection.map_window(self.window)?;
         connection.flush()?;
         Ok(())
-    }
-}
-
-impl Drop for TabBar {
-    fn drop(&mut self) {
-        unsafe {
-            x11::xlib::XFreePixmap(self.display, self.pixmap);
-        }
     }
 }

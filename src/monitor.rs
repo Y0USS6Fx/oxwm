@@ -1,9 +1,40 @@
+use crate::client::TagMask;
 use crate::errors::WmError;
 use x11rb::protocol::xinerama::ConnectionExt as _;
 use x11rb::protocol::xproto::{Screen, Window};
 use x11rb::rust_connection::RustConnection;
 
 type WmResult<T> = Result<T, WmError>;
+
+#[derive(Debug, Clone)]
+pub struct Pertag {
+    pub current_tag: usize,
+    pub previous_tag: usize,
+    pub num_masters: Vec<i32>,
+    pub master_factors: Vec<f32>,
+    pub layouts: Vec<String>,
+    pub show_bars: Vec<bool>,
+}
+
+impl Pertag {
+    pub fn new(
+        num_tags: usize,
+        default_num_master: i32,
+        default_master_factor: f32,
+        default_show_bar: bool,
+        default_layout: &str,
+    ) -> Self {
+        let len = num_tags + 1;
+        Self {
+            current_tag: 1,
+            previous_tag: 1,
+            num_masters: vec![default_num_master; len],
+            master_factors: vec![default_master_factor; len],
+            layouts: vec![default_layout.to_string(); len],
+            show_bars: vec![default_show_bar; len],
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Monitor {
@@ -34,6 +65,8 @@ pub struct Monitor {
     pub stack_head: Option<Window>,
     pub bar_window: Option<Window>,
     pub layout_indices: [usize; 2],
+    pub scroll_offset: i32,
+    pub pertag: Option<Pertag>,
 }
 
 impl Monitor {
@@ -66,7 +99,19 @@ impl Monitor {
             stack_head: None,
             bar_window: None,
             layout_indices: [0, 1],
+            scroll_offset: 0,
+            pertag: None,
         }
+    }
+
+    pub fn init_pertag(&mut self, num_tags: usize, default_layout: &str) {
+        self.pertag = Some(Pertag::new(
+            num_tags,
+            self.num_master,
+            self.master_factor,
+            self.show_bar,
+            default_layout,
+        ));
     }
 
     pub fn contains_point(&self, x: i32, y: i32) -> bool {
@@ -74,6 +119,10 @@ impl Monitor {
             && x < self.screen_x + self.screen_width
             && y >= self.screen_y
             && y < self.screen_y + self.screen_height
+    }
+
+    pub fn get_selected_tag(&self) -> TagMask {
+        self.tagset[self.selected_tags_index]
     }
 }
 
@@ -97,7 +146,7 @@ pub fn detect_monitors(
         .xinerama_is_active()
         .ok()
         .and_then(|cookie| cookie.reply().ok())
-        .map_or(false, |reply| reply.state != 0);
+        .is_some_and(|reply| reply.state != 0);
 
     if xinerama_active {
         let Ok(xinerama_cookie) = connection.xinerama_query_screens() else {
